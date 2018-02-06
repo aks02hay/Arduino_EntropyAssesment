@@ -1,11 +1,7 @@
-/*
- * Arduino entropy assesment lib,  as specified in SP800-90B
- * Implementation of individual tests by Ram Singh (as a school project)
- */
-
 #include "Entropy.h"
 #include <string.h>
 #include <math.h>
+#include <map>
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -13,7 +9,6 @@
 
 /*
   void Entropy::convertToArray(String input, char* output){
-
   }
 */
 
@@ -23,30 +18,25 @@ float Entropy::allTests(char* input, size_t len) {
 }
 
 //individual tests
+// 6.3.1
 float Entropy::mostCommonValueEstimate(char* input, size_t len) {
 
   char data[len];
   memcpy(data, input, len * sizeof(char));
-
-  //sort for easy counting
-  sortArray(data, len);
-
-  char current = data[0];
-  int countCurrent = 1;
-  int totalCount = 1;
+  
   int cmax = 1;
-  for (int i = 1; i < len; i++) {
-    if (data[i] == current) {
-      countCurrent = countCurrent + 1;
-      if (countCurrent > cmax) {
-        cmax = countCurrent;
-      }
-    } else {
-      current = data[i];
-      totalCount = totalCount + 1;
-      countCurrent = 1;
-    }
+  int countar[3];
+  memset(countar, 0, 3 * sizeof(int));
+  
+  //Values for input array veries from 0-2.
+  //loop for counting number of occurences for each value
+  for (int i = 0; i < len; i++)
+  {
+  	countar[data[i] - '0']++;
   }
+  
+  cmax = MAX(countar[0],countar[1]);
+  cmax = MAX(cmax,countar[2]);
   float pmax = (cmax * 1.0) / (len * 1.0);
   float ubound = pmax + 2.576 * sqrt(pmax * (1.0 - pmax) / (len * 1.0));
   float pu = MIN(1, ubound);
@@ -54,13 +44,12 @@ float Entropy::mostCommonValueEstimate(char* input, size_t len) {
   return entropy;
 }
 
+
+// 6.3.2
 float Entropy::collisionEstimate(char* input, size_t len) {
 
   char data[len];
   memcpy(data, input, len * sizeof(char));
-
-  //void collistionEstimate(char *input, size_t len,  float *p, float *min_entropy)
-  //{
 
   /*1. Set v = 1, index = 1
     2. Beginning with s_index, step through the dataset until any observed
@@ -91,8 +80,7 @@ float Entropy::collisionEstimate(char* input, size_t len) {
     {
       if (input[index] == input[j])  // searching the same value in the remaining set
       {
-        tv[v] = j - index + 1;
-        v = v + 1;
+        tv[v++] = j - index + 1;
         index = j ;
         break;
       }
@@ -147,11 +135,12 @@ float Entropy::collisionEstimate(char* input, size_t len) {
   return entropy;
 }
 
+// 6.3.3
 float Entropy::markovEstimate(char* input, size_t len) {
 
   char data[len];
   memcpy(data, input, len * sizeof(char));
-  Serial.println("step0");
+  //Serial.println("step0");
   int O_i, O_j; // Intrim variable
   int d = 128;
   int k = 3; // Number of symbols in input string. Need to be set before calling
@@ -170,6 +159,7 @@ float Entropy::markovEstimate(char* input, size_t len) {
   float epsilon = 0.0;
   float Pmax = 0.0;
   float entropy = 0.0;
+  
   /* 1. The confidence level to be alpha = min(alpha^k ^ 2, alpha^d)
         where k ^ 2 is the number of terms in the transition matrix and d = 128 is
       the assumed length of the Markov chain.*/
@@ -178,8 +168,7 @@ float Entropy::markovEstimate(char* input, size_t len) {
   alpha = MIN(pow(0.99, temp), pow(0.99, (float)d));
 
   // Probe-1
-  //printf("\n Value of alpha = %f \n", alpha);
-  Serial.println("step1");
+  
   /*2. Estimate the initial state probability distribution, P, with:
        Pi = min(1, o_i / L + epsilon)cv */
   for (int i = 0; i < k; i++)
@@ -194,29 +183,27 @@ float Entropy::markovEstimate(char* input, size_t len) {
   {
     for (int j = 0; j < len; j++)
     {
-      //printf("\n value of i = %d, value of ip[%d]=%d\n",i,j,(int)(data[j]));
       if (i == (int)(data[j] - '0'))
       {
-        Oi[i] = Oi[i] + 1;
-        //printf("Oi[%d]=%d\n",i,Oi[i]);
+        Oi[i]++;
+      }
+      
+      //Initializing the Matrix
+      if(j<k)
+      {
+      	Oij[i][j] = 0.0;
       }
     }
-    //printf("%d\n", Oi[i]);
   }
-  // printf("\n");
   //Probe-2
-  Serial.println("step2");
   float epsilon_term = log2(1 / (1 - alpha));
 
   epsilon = sqrt(epsilon_term / (2 * (float)len));
 
-  //printf("\n epsilon = %f\n", epsilon);
 
   for (int i = 0; i < k; i++)
   {
     Pi[i] = MIN(1.0, (Oi[i] / L + epsilon));
-
-    //printf("%d,\t %f\n", Oi[i], Pi[i]);
   }
 
   /*3.Let o_s_L = o_s_L - 1
@@ -224,40 +211,22 @@ float Entropy::markovEstimate(char* input, size_t len) {
     bounding matrix construction.Nothing follows the last occurance,
     therefore it should not be included in transition proportion. */
   Oi[k - 1] = Oi[k - 1] - 1;
-  //printf("\n%d,\t %d", Oi[k-1], Oi[2]);
 
-  Serial.println("step3");
   /*4. Estimate the probabilities in the transition matrix T, overestimating where...
      Ti, j = 1 if o_i = 0
      min(1, oi, j + eps_i) otherwise */
-  //Initializing the Matrix
-  for (int i = 0; i < k; i++)
-  {
-    for (int j = 0; j < k; j++)
-    {
-      Oij[i][j] = 0.0;
-      //Tij[i][j] = 1.0;
-    }
-  }
-
+  
   O_i = (int)(data[0] - '0');
   for (int j = 1; j < len; j++)
   {
-    //O_i = (int)(data[i]-'0');
-    //for (int j = 0; j < len; j++)
-    //{
     O_j = (int)(data[j] - '0');
     Oij[O_i][O_j] ++;
     O_i = O_j;
-    //Tij[i][j] = 1.0;
-    //}
-
   }
 
   for (int i = 0; i < 3; i++)
   {
     epsilon_i[i] = sqrt(epsilon_term / (2 * (float) Oi[i]));
-    //printf("\n%f\t %f\t%d\n", epsilon_i[i], epsilon_term,Oi[i]);
   }
 
   for (int i = 0; i < k; i++)
@@ -269,12 +238,9 @@ float Entropy::markovEstimate(char* input, size_t len) {
       else
         //temp = Oij[i][j] / Oi[i] + epsilon_i[i];
         Tij[i][j] = MIN(1.0, (Oij[i][j] / Oi[i] + epsilon_i[i]));
-      // printf("\t %f", Tij[i][j]);
-
     }
-    // printf("\n");
   }
-  Serial.println("step4");
+ 
   for (int j = 0; j < d - 1; j++)
   {
     for (int c = 0; c < k; c++)
@@ -286,8 +252,6 @@ float Entropy::markovEstimate(char* input, size_t len) {
         h_temp = MAX(Ppi[i], h_temp);
       }
       hc[c] = h_temp;
-      //Pi[c] = hc[c];
-
     }
 
     for (int i = 0; i < k; i++)
@@ -302,18 +266,14 @@ float Entropy::markovEstimate(char* input, size_t len) {
 
   }
 
-  Serial.println("step5");
-  //printf("\n Pmax =%f",Pmax);
-
   // The value of Pmax is reduced to 0.0000 after 128 iteration. therfore minimum value is assigned
-  //Pmax=MAX(0.001,Pmax);
-  Pmax = 0.00001;
-  Serial.println("Pmax");
-  //Serial.println(Pmax);
+  Pmax=MAX(0.00001,Pmax);
+  //Pmax = 0.00001;
   entropy = -log2(Pmax) / d;
 
   return entropy;
 }
+
 
 // 6.3.4
 float Entropy::compressionEstimate(char* input, size_t len) {
@@ -362,12 +322,7 @@ float Entropy::compressionEstimate(char* input, size_t len) {
 
   }
 
-  /*for (size_t j = 0; j < k; j++)
-    {
-
-    printf("value of dictionary obained are dict[%d]=%d \n",j,  dict[j]);
-
-    }*/
+  
   for (size_t i = d; i < len; i++)
   {
     for (size_t j = 0; j < k; j++)
@@ -385,7 +340,7 @@ float Entropy::compressionEstimate(char* input, size_t len) {
       }
 
     }
-    //printf("Value of D[%d] = %d\n", (i - d), D[i - d]);
+    
 
   }
   // Step 4 -
@@ -396,17 +351,15 @@ float Entropy::compressionEstimate(char* input, size_t len) {
 
   //printf("\n max sk = %d", max_sk);
   b = log2((float)max_sk) + 1.0;  // The Max(x1,x2,x3..xk)
-  //printf("\n b = %f", b);
+  
   for (size_t i = 0; i < v; i++)
   {
     mean_x += log2(D[i]);
   }
   mean_x = mean_x / (float)v;
-  //printf("\n Mean = %f", mean_x);
 
   float term = (-3.0) / b;
   c = 0.7 - (0.8 / b) + (4.0 + (32.0 / b)) * pow((float)v, term) / (float)v;
-  //printf("\n c = %f", c);
 
   term = 0.0;
   float term1 = 0.0;
@@ -421,36 +374,29 @@ float Entropy::compressionEstimate(char* input, size_t len) {
   //Step -5 Calculating the mean_x_prime
 
   prime_mean_x = mean_x - (2.57 * std_dev) / sqrt((float)v);
-  //printf("\n X prime = %f", prime_mean_x);
+  
   valid = solve_for_p_634(prime_mean_x, k, v, d, &p);
 
   if (valid == 0)
-  { // No solution to equation.Assume max min - entropy.
+  { // No solution to equation
 
     p = 1.0 / (float)len;
     min_entropy = log2((float)len);
-    //printf("\n No valid solution p= %f", p);
 
   }
 
   else
   {
     min_entropy = -log2(p);
-    //printf("\n valid solution p= %f", p);
-
   }
 
   return (min_entropy);
 
 }
 
+
 //6.3.5
 float Entropy::tTupleEstimate(char* input, size_t len) {
-
-  //char* data; // For VS2015
-  //data = (char*)malloc(sizeof(char) * len); // For VS2015
-  char data[len];
-  memcpy(data, input, len * sizeof(char));
 
   float min_entropy = 0.0;
   size_t L = 21;
@@ -460,11 +406,15 @@ float Entropy::tTupleEstimate(char* input, size_t len) {
   float Pmax = 0.0;
   float temp = 0.0;
   int tuple_found = 0;
+  map<string,int> m;
   // counter variables
   size_t tuple_size = 0;
   size_t step = 0;
   size_t i = 0;
   size_t j = 0;
+  
+  string A; //string copy of input char array 
+  string s; //variable to store parts of string as tuple
 
   // Initializing the Q[i]
   for (i = 0; i < L; i++)
@@ -472,45 +422,30 @@ float Entropy::tTupleEstimate(char* input, size_t len) {
     Q[i] = 0.0;
     P[i] = 0.0;
     P_max[i] = 0.0;
+    A+=input[i];
   }
-  // step -1 is bypassed due to small data sample
 
+  // step -1 is bypassed due to small data sample
+  
   // Step -2 for finding Q[i]
   // first loop for forming tuples form 1 to L/2
   for (tuple_size = 1; tuple_size <= (size_t)(L / 2); tuple_size++)
   {
-    // Loop for selecting tuple of given size
-    for (step = 0; step < L; step = step + tuple_size)
-    {
-      temp = 1.0; // The minimum occurance of any tuple is 1
-      // loop for searching similar tuple
-      //for (i = step + tuple_size; i < L - tuple_size; i++)
-      for (i = step + tuple_size; i <= L - tuple_size; i++)
-      {
-        tuple_found = 1;
-        // loop for matching the element of tuple
-        for (j = 0; j < tuple_size; j++)
-        {
-          //if (data[i-tuple_size+j]!=data[i+j])
-          if (data[step + j] != data[i + j])
-          {
-            tuple_found = 0;
-            break;
-          }
-
-        } // end of tuple element matching
-        if (tuple_found)
-        {
-          temp++;
-          //printf("\n Tuple match found"); //Probe
-        }
-
-      } // end of tuple count search
-      Q[tuple_size] = max(Q[tuple_size], temp);
-      //printf("Value of temp = %f",temp);  // Probe
-      //printf("\n Q[%d]= %f",tuple_size,Q[tuple_size]); // Probe
-    }
+  	temp=1; // The minimum occurance of any tuple is 1
+  	// Loop for selecting tuple of given size
+  	for (step = 0; step <= L-tuple_size; step++)
+  	{
+  		//selecting all the substrings for fixed length and mapping count values
+  		s=A.substr(step,tuple_size); 
+  		m[s]++;
+  		temp=MAX(m[s],temp);
+  	
+  	}
+  	Q[tuple_size]=(float)temp;
   }
+  
+//  for(i=0;i<L;i++)
+//  	print values obtained for Q[i]
 
   // Step -3
   for (i = 1; i <= L / 2; i++)
@@ -523,14 +458,11 @@ float Entropy::tTupleEstimate(char* input, size_t len) {
   //printf("\n Pmax =%f", Pmax);
   min_entropy = -log2(Pmax);
   return (min_entropy);
-  //return 0;
 }
-//6.3.6 lrsEstimate
+
+
+// 6.3.6 
 float Entropy::lrsEstimate(char* input, size_t len) {
-  //char* data;
-  //data = (char*)malloc(sizeof(char) * len);
-  char data[len];
-  memcpy(data, input, len * sizeof(char));
 
   float min_entropy = 0.0;
   size_t L = len;
@@ -538,13 +470,14 @@ float Entropy::lrsEstimate(char* input, size_t len) {
   //float P[21];    // should be optimized for L/2
   //float P_max[21];  // should be optimized for L/2
   //float Pmax = 0.0;
-  float temp = 0.0;
+  int temp = 0;
 
   float P_w[21];
   float Pmax_w[21];
   float Pmaxw = 0.0;
 
   int tuple_found = 0;
+  map<string,int> m;
   // counter variables
   size_t tuple_size = 0;
   size_t step = 0;
@@ -552,6 +485,9 @@ float Entropy::lrsEstimate(char* input, size_t len) {
   size_t j = 0;
   size_t u = 0;
   size_t v = 0;
+  
+  string A; //string copy of input char array 
+  string s; //variable to store parts of string as tuple
 
   // Initializing the Q[i]
   for (i = 0; i < L; i++)
@@ -559,7 +495,7 @@ float Entropy::lrsEstimate(char* input, size_t len) {
     Q[i] = 0.0;
     P_w[i] = 0.0;
     Pmax_w[i] = 0.0;
-
+	A+=input[i];
   }
   // step -1 is by passed due to small data sample
 
@@ -567,38 +503,21 @@ float Entropy::lrsEstimate(char* input, size_t len) {
   // first loop for forming tuples form 1 to L/2
   for (tuple_size = 1; tuple_size <= (size_t)(L / 2); tuple_size++)
   {
-    // Loop for selecting tuple of given size
-    for (step = 0; step < L; step = step + tuple_size)
-    {
-      temp = 1.0; // The minimum occurance of any tuple is 1
-      // loop for searching similar tuple
-      //for (i = step + tuple_size; i < L - tuple_size; i++)
-      for (i = step + tuple_size; i <= L - tuple_size; i++)
-      {
-        tuple_found = 1;
-        // loop for matching the element of tuple
-        for (j = 0; j < tuple_size; j++)
-        {
-          //if (data[i-tuple_size+j]!=data[i+j])
-          if (data[step + j] != data[i + j])
-          {
-            tuple_found = 0;
-            break;
-          }
-
-        } // end of tuple element matching
-        if (tuple_found)
-        {
-          temp++;
-          //printf("\n Tuple match found"); //Probe
-        }
-
-      } // end of tuple count search
-      Q[tuple_size] = max(Q[tuple_size], temp);
-      //printf("Value of temp = %f",temp);  // Probe
-      //printf("\n Q[%d]= %f",tuple_size,Q[tuple_size]); // Probe
-    }
+  	temp=1; // The minimum occurance of any tuple is 1
+  	// Loop for selecting tuple of given size
+  	for (step = 0; step <= L-tuple_size; step++)
+  	{
+  		//selecting all the substrings for fixed length and mapping count values
+  		s=A.substr(step,tuple_size); 
+  		m[s]++;
+  		temp=MAX(m[s],temp);
+  	
+  	}
+  	Q[tuple_size]=(float)temp;
   }
+  
+//  for(i=0;i<L;i++)
+//  	print values obtained for Q[i]
 
   //Step-1/2 Finding u and v
 
@@ -629,13 +548,12 @@ float Entropy::lrsEstimate(char* input, size_t len) {
   }
 
   // Step -4
-
-  //printf("\n Pmax =%f", Pmaxw);
   min_entropy = -log2(Pmaxw);
   return (min_entropy);
-  //return 0;
 }
-//3.6.7 multiMCW
+
+
+// 6.3.7 multiMCW
 float Entropy::multiMCWEstimate(char* input, size_t len) {
   //char* data; // VS 2015
   // data = (char*)malloc(sizeof(char) * len); // VS 2015
@@ -705,8 +623,6 @@ float Entropy::multiMCWEstimate(char* input, size_t len) {
       //printf(" frequent [%d]= %c", j, frequent[j]);
 
     }
-    //printf("\n");
-
 
     //Step- 3b
 
@@ -720,8 +636,6 @@ float Entropy::multiMCWEstimate(char* input, size_t len) {
 
     //Step- 3d
 
-
-    //printf("\n ");
     for (j = 0; j < 4; j++)
     {
       if (frequent[j] == data[i])
@@ -733,12 +647,9 @@ float Entropy::multiMCWEstimate(char* input, size_t len) {
         }
       }
       //printf("scoreboard[%d] = %d", j, scoreboard[j]);
-    }//end of loop for j
-
-    //printf("\n Winner = %d, Prediction = %c, Correct[%d] = %d", winner+1, prediction, i,correct[i-w[0]]);
-
-        
-  } // end of i loop
+    }
+   
+  } 
 
   // Step - 4
 
@@ -752,10 +663,9 @@ float Entropy::multiMCWEstimate(char* input, size_t len) {
   Pavg = Pglob+2.576*sqrt((Pglob*(1-Pglob))/(float)(N-1));
 
   //printf("\nPavg = %f", Pavg);
-
-
+  
   //step - 6
-  //Prun = calcRun(correct);
+  
   r = findMaxRun(correct, N);
   r =r+1;
   //printf("Value of r = %d",r);
@@ -768,11 +678,12 @@ float Entropy::multiMCWEstimate(char* input, size_t len) {
   //Pmax = 0.76;
   min_entropy = -log2(Pmax);
   return (min_entropy);
-  //return 0;
 
 
 }
-//3.6.8 lagPredictionEstimate
+
+
+// 6.3.8 
 float Entropy::lagPredictionEstimate(char* input, size_t len)
 {
   //char* data; // for VS 2015
@@ -817,7 +728,7 @@ float Entropy::lagPredictionEstimate(char* input, size_t len)
 
   for (i = 1 ; i < L; i++)
   {
-    //printf("\n i = %d\n",i+1);
+    
     //Step -2a
     for (d = 0; d < D; d++)
     {
@@ -832,8 +743,6 @@ float Entropy::lagPredictionEstimate(char* input, size_t len)
       //printf(" lag [%d]= %c", d, lag[d]);
 
     }
-    //printf("\n");
-
 
     //Step- 2b
 
@@ -846,8 +755,6 @@ float Entropy::lagPredictionEstimate(char* input, size_t len)
     }
 
     //Step- 2d
-    
-    //printf("\n ");
     for (d = 0; d < D; d++)
     {
       if (lag[d] == data[i])
@@ -859,15 +766,11 @@ float Entropy::lagPredictionEstimate(char* input, size_t len)
         }
       }
       //printf("scoreboard[%d] = %d", d, scoreboard[d]);
-    }//end of loop for j
+    }
 
-    //printf("\n Winner = %d, Prediction = %c, Correct[%d] = %d", winner+1, prediction, i,correct[i-1]);
-
-        
-  } // end of i loop
+  }
 
   // Step - 4
-
   for (i = 0; i < N; i++)
   {
     C = C + correct[i];
@@ -878,7 +781,6 @@ float Entropy::lagPredictionEstimate(char* input, size_t len)
   Pavg = Pglob+2.576*sqrt((Pglob*(1.0-Pglob))/(float)(N-1));
 
   //printf("\nPavg = %f", Pavg);
-
 
   //step - 6
   //Prun = calcRun(correct);
@@ -894,7 +796,6 @@ float Entropy::lagPredictionEstimate(char* input, size_t len)
   //Pmax = 0.76;
   min_entropy = -log2(Pmax);
   return (min_entropy);
-  //return 0;
 }
 
 //3.6.9 multiMMCEstimate
@@ -958,14 +859,12 @@ float Entropy::multiMMCEstimate(char* input, size_t len)
           MMC[k] = data[k];
           //printf("%c", MMC[k]);
         }
-        //printf("\n");
+        
       }
 
-
-    } // end of d loop
-    //printf("\n");
+    } 
+    
     //Step - 4b
-
     for (d = 0; d < D; d++)
     {
       l = 0;
@@ -980,9 +879,8 @@ float Entropy::multiMMCEstimate(char* input, size_t len)
         }
         //printf("\n");
       }
-      
-      
-    } // end of d loop
+            
+    } 
 
     // Loop for searching ymax
     for (d = 0; d < D; d++)
@@ -1043,11 +941,8 @@ float Entropy::multiMMCEstimate(char* input, size_t len)
         }
       }
       //printf("scoreboard[%d] = %d", d, scoreboard[d]);
-    }//end of loop for d
-
-    //printf("\n Winner = %d, Prediction = %c, Correct[%d] = %d", winner+1, prediction, i,correct[i-2]);
-
-        
+    }
+    
   } // end of i loop (master loop)
 
   // Step - 5
@@ -1196,8 +1091,6 @@ float Entropy::LZ78YEstimate(char* input, size_t len)
       correct[i - B - 1] = 1;
     }
     
-   //printf("\n Prediction = %c, Correct[%d] = %d,Si = %c", prediction, i-B-1,correct[i-B-1],data[i]); // for VS2015
-        
   } // end of i loop (master loop)
 
   // Step - 5
@@ -1205,14 +1098,13 @@ float Entropy::LZ78YEstimate(char* input, size_t len)
   for (i = 0; i < N; i++)
   {
     C = C + correct[i];
-    //printf("%d", correct[i]); //for VS 2015
   }
     
   //Step - 6
   Pglob = (float)C / (float)N;
   Pavg = Pglob+2.576*sqrt((Pglob*(1.0-Pglob))/(float)(N-1));
 
-  //printf("\nPavg = %f", Pavg); //for VS 2015
+  //printf("\nPavg = %f", Pavg); 
 
 
   //step - 7
@@ -1238,7 +1130,7 @@ float Entropy::log2( float n ) {
 }
 
 
-void Entropy::sortArray(char* input, size_t len) {
+/*void Entropy::sortArray(char* input, size_t len) {
   if (len < 2) return;
 
   char pivot = input[len / 2];
@@ -1257,7 +1149,7 @@ void Entropy::sortArray(char* input, size_t len) {
 
   sortArray(input, i);
   sortArray(input + i, len - i);
-}
+}*/
 
 size_t Entropy::solveForP(float mu_bar, float* p)
 {
@@ -1315,6 +1207,7 @@ size_t Entropy::solveForP(float mu_bar, float* p)
   }
 
 }
+
 float Entropy::calcEpS(float p1)
 {
   //printf("\n p_c calcEpS %f", p_c);
@@ -1349,6 +1242,7 @@ float Entropy::calcEpS(float p1)
   Ep = p1 * iq2 * (1.0 + i_k * (ip - iq)) * F_q - (p1 * iq * i_k * (ip - iq));
   return (Ep);
 }
+
 // functions of 6.3.4
 int Entropy::solve_for_p_634(float mu_bar, size_t n, size_t v, size_t d, float *p)
 {
@@ -1467,37 +1361,31 @@ float Entropy::func_G(float p, size_t v, size_t d)
 
 // Functions for 6.3.7 to 6.3.10
 //Function for finding the most common value in the array
-char Entropy:: mostComman(char* data, size_t length)
+char Entropy:: mostComman(char* data, size_t len)
 {
-  size_t maxCount = 0;  // Initializing the maxCount Variable
-  size_t count = 0;
-  char commonValue;
-  for (size_t i = 0; i < length; i++)
-  {
-    count = 0;   // re-initalizing the count for next common value
-    for (size_t j = i; j < length; j++)
-    {
-      if (data[i] == data[j])  // searching the same value in the remaining set
-      {
-        count++;
-      }
-    }// End of for loop for j
-
-     //printf("\n Value = %c, Count = %d",input[i],count); // Probe for displaying the result
-
-     // Comparing the count value with previous maxCount value, if heigher replace it.
-
-    if (count >= maxCount)
-    {
-      commonValue = data[i];
-      maxCount = count;
-      //printf("\n most Common value %c\n", commonValue);
-    }
-
-
-  } // End of for loop for i
+  char arr[len];
+  memcpy(arr, data, len * sizeof(char));
+  size_t k=3;
+  size_t i;
+  char commanValue;
   
-  return(commonValue);
+  //loop to increase value for obtaining most comman value
+  for (i = 0; i< len; i++)
+        data[(data[i])%k] += k;
+  
+  int max = data[0];
+  size_t result = 0;
+    for (i = 1; i < len; i++)
+    {
+        if (data[i] > max)
+        {
+            max = data[i];
+            result = i;
+        }
+    }      
+  commanValue=result + '0';      
+  
+  return(commanValue);
 }
 // function to find maximum run in correct
 size_t Entropy::findMaxRun(size_t *correct, size_t N)
@@ -1528,7 +1416,6 @@ size_t Entropy::findMaxRun(size_t *correct, size_t N)
 }
 
 // fucntion to calculate calcRun
-
 float Entropy::calcRun(size_t r, size_t N)
 {
 
@@ -1585,4 +1472,3 @@ float Entropy::find_root(float p, size_t r)
   //printf("\n Value of s =%f", s);
   return(s);
 }
-
