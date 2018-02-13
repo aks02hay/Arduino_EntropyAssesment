@@ -1,14 +1,26 @@
 #include "Entropy.h"
+#include <StandardCplusplus.h>
+#include <system_configuration.h>
+#include <unwind-cxx.h>
+#include <utility.h>
+#include <serstream>
+#include <string>
+//#include <vector>
+//#include <iterator>
+//#include <map>
+
+using namespace std;
+
 
 Entropy e;
 
-char string[501];
+char str[501];
 unsigned long time1;
 unsigned long time2;
-size_t k=255;
+size_t k = 255;
 void setup() {
   Serial.begin(9600);
-  
+
 }
 
 void loop() {
@@ -17,42 +29,40 @@ void loop() {
   fillString();
   Serial.println("String ready");
   time1 = millis();
-  //float minE=0;
+  float minE=0;
   //6.3.1
-  //float minE = e.mostCommonValueEstimate(&string[0], 500);
+  //minE = e.mostCommonValueEstimate(&str[0], 500);
   //6.3.2
-  //float minE = e.collisionEstimate(&string[0], 500);
+  //minE = e.collisionEstimate(&str[0], 100);
   //6.3.3
-  //float minE = e.markovEstimate(&string[0],100);
+  //minE = e.markovEstimate(&str[0],100);
   //6.3.4
-  //float minE = e.compressionEstimate(&string[0],100);
+  //minE = e.compressionEstimate(&str[0],21);
   //6.3.5
-  //float minE = e.tTupleEstimate(&string[0],100);
+  //minE = e.tTupleEstimate(&str[0],21);
   //6.3.6
-  //float minE = e.lrsEstimate(&string[0],10);
+  //minE = e.lrsEstimate(&str[0],10);
   //6.3.7
-  //float minE = e.multiMCWEstimate(&string[0],10);
+  //minE = e.multiMCWEstimate(&str[0],10);
   //6.3.8
-  //float minE = e.lagPredictionEstimate(&string[0],5);
+  //minE = e.lagPredictionEstimate(&str[0],5);
   //6.3.9
-  //float minE = e.multiMMCEstimate(&string[0],12);
+  //minE = e.multiMMCEstimate(&str[0],12);
   //6.3.10
-  float minE = e.LZ78YEstimate(&string[0],12);
-  
+  //float minE = e.LZ78YEstimate(&str[0], 12);
+
   time2 = millis();
   Serial.println(minE);
-  Serial.println(time2-time1);
+  Serial.println(time2 - time1);
 
-  for(;;){
+  for (;;) {
     delay(1000);
   }
 }
 
-void fillString(){
-   for(int i = 0; i < 100; i++){
-      string[i] = random(3);    
-      if(i % 10 == 0){
-         Serial.println(i);
-      }
-   }   
+void fillString() {
+  for (int i = 0; i < 21; i++) {
+    str[i] = random(3) + '0';
+    
+  }
 }
