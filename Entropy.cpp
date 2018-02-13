@@ -1,7 +1,10 @@
-#include "Entropy.h"
+#include "StandardCplusplus.h"
 #include <string.h>
 #include <math.h>
 #include <map>
+#include "Entropy.h"
+
+using namespace std;
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -20,19 +23,15 @@ float Entropy::allTests(char* input, size_t len) {
 //individual tests
 // 6.3.1
 float Entropy::mostCommonValueEstimate(char* input, size_t len) {
-
-  char data[len];
-  memcpy(data, input, len * sizeof(char));
   
-  int cmax = 1;
-  int countar[3];
-  memset(countar, 0, 3 * sizeof(int));
+  size_t cmax = 1;
+  size_t countar[3] = {0,0,0}; //variable to count occurences of digits 0-2
   
-  //Values for input array veries from 0-2.
+  //Values for input array varies from 0-2.
   //loop for counting number of occurences for each value
-  for (int i = 0; i < len; i++)
+  for (size_t i = 0; i < len; i++)
   {
-  	countar[data[i] - '0']++;
+  	countar[input[i]-'0']++;
   }
   
   cmax = MAX(countar[0],countar[1]);
@@ -346,7 +345,7 @@ float Entropy::compressionEstimate(char* input, size_t len) {
   // Step 4 -
   for (size_t i = 0; i < len - 1; i++)
   {
-    max_sk = max(((int)(data[i] - '0')), max_sk);
+    max_sk = MAX(((int)(data[i] - '0')), max_sk);
   }
 
   //printf("\n max sk = %d", max_sk);
@@ -398,6 +397,11 @@ float Entropy::compressionEstimate(char* input, size_t len) {
 //6.3.5
 float Entropy::tTupleEstimate(char* input, size_t len) {
 
+  //char* data; // For VS2015
+  //data = (char*)malloc(sizeof(char) * len); // For VS2015
+  char data[len];
+  memcpy(data, input, len * sizeof(char));
+
   float min_entropy = 0.0;
   size_t L = 21;
   float Q[21];      // should be optimized for L/2
@@ -406,14 +410,14 @@ float Entropy::tTupleEstimate(char* input, size_t len) {
   float Pmax = 0.0;
   float temp = 0.0;
   int tuple_found = 0;
-  map<string,int> m;
   // counter variables
   size_t tuple_size = 0;
   size_t step = 0;
   size_t i = 0;
   size_t j = 0;
-  
-  string A; //string copy of input char array 
+
+  std::map<string,int> m; //map to count the occurence for each tuple as a string
+  string A; //variable to recreate input string for using string functions
   string s; //variable to store parts of string as tuple
 
   // Initializing the Q[i]
@@ -422,11 +426,10 @@ float Entropy::tTupleEstimate(char* input, size_t len) {
     Q[i] = 0.0;
     P[i] = 0.0;
     P_max[i] = 0.0;
-    A+=input[i];
+    A+=input[i]; //getting input string from char array
   }
-
   // step -1 is bypassed due to small data sample
-  
+
   // Step -2 for finding Q[i]
   // first loop for forming tuples form 1 to L/2
   for (tuple_size = 1; tuple_size <= (size_t)(L / 2); tuple_size++)
@@ -443,9 +446,6 @@ float Entropy::tTupleEstimate(char* input, size_t len) {
   	}
   	Q[tuple_size]=(float)temp;
   }
-  
-//  for(i=0;i<L;i++)
-//  	print values obtained for Q[i]
 
   // Step -3
   for (i = 1; i <= L / 2; i++)
@@ -454,7 +454,7 @@ float Entropy::tTupleEstimate(char* input, size_t len) {
     P_max[i] = pow(P[i], (1.0 / (float)i));
     Pmax = max(P_max[i], Pmax);
   }
-
+	
   //printf("\n Pmax =%f", Pmax);
   min_entropy = -log2(Pmax);
   return (min_entropy);
@@ -477,7 +477,6 @@ float Entropy::lrsEstimate(char* input, size_t len) {
   float Pmaxw = 0.0;
 
   int tuple_found = 0;
-  map<string,int> m;
   // counter variables
   size_t tuple_size = 0;
   size_t step = 0;
@@ -486,7 +485,8 @@ float Entropy::lrsEstimate(char* input, size_t len) {
   size_t u = 0;
   size_t v = 0;
   
-  string A; //string copy of input char array 
+  std::map<string,int> m; //map to count the occurence for each tuple as a string
+  string A; //variable to recreate input string for using string functions
   string s; //variable to store parts of string as tuple
 
   // Initializing the Q[i]
@@ -495,7 +495,7 @@ float Entropy::lrsEstimate(char* input, size_t len) {
     Q[i] = 0.0;
     P_w[i] = 0.0;
     Pmax_w[i] = 0.0;
-	A+=input[i];
+    A+=input[i]; //getting input string from char array
   }
   // step -1 is by passed due to small data sample
 
@@ -516,8 +516,8 @@ float Entropy::lrsEstimate(char* input, size_t len) {
   	Q[tuple_size]=(float)temp;
   }
   
-//  for(i=0;i<L;i++)
-//  	print values obtained for Q[i]
+	
+//print values obtained for Q[i]
 
   //Step-1/2 Finding u and v
 
@@ -543,7 +543,7 @@ float Entropy::lrsEstimate(char* input, size_t len) {
   {
     P_w[i] = (Q[i] * (Q[i] - 1.0) / 2.0) / ((float)(L - i + 1) * ((float)(L - i)) / 2.0);
     Pmax_w[i] = pow(P_w[i], (1.0 / (float)i));
-    Pmaxw = max(Pmaxw, Pmax_w[i]);
+    Pmaxw = MAX(Pmaxw, Pmax_w[i]);
 
   }
 
@@ -672,7 +672,7 @@ float Entropy::multiMCWEstimate(char* input, size_t len) {
   Prun = calcRun(r, N);
 
   //step - 7
-  Pmax = max(Pavg, Prun);
+  Pmax = MAX(Pavg, Prun);
   //printf("\n Pmax =%f",Pmax);
   //printf("\n Pmax =%f", Prun);
   //Pmax = 0.76;
@@ -1375,7 +1375,7 @@ char Entropy:: mostComman(char* data, size_t len)
   
   int max = data[0];
   size_t result = 0;
-    for (i = 1; i < len; i++)
+  for (i = 1; i < len; i++)
     {
         if (data[i] > max)
         {
